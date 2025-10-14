@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Train Like AJ - Boxing AI Coach</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="/src/css/styles.css">
+  <style>
+    /* Form Guide Styles */
+    .form-guide {
+      position: absolute;
+      top: 80px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 16px;
+      min-width: 280px;
+      max-width: 350px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      border: 2px solid rgba(255, 215, 0, 0.3);
+      z-index: 50;
+      animation: slideInRight 0.3s ease-out;
+    }
+    @keyframes slideInRight {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .form-guide-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+    }
+    .form-guide-icon { font-size: 1.5rem; }
+    .form-guide-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #FFD700;
+    }
+    .form-guide-content {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .form-tip {
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      color: #fff;
+      border-left: 3px solid #FFD700;
+      transition: opacity 0.3s;
+    }
+    .form-tip.warning {
+      border-left-color: #FF6B6B;
+      background: rgba(255, 107, 107, 0.1);
+    }
+    .form-tip.success {
+      border-left-color: #4ECDC4;
+      background: rgba(78, 205, 196, 0.1);
+    }
+    .stance-indicator {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      border-radius: 24px;
+      padding: 12px 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      border: 2px solid rgba(255, 215, 0, 0.3);
+      z-index: 50;
+      animation: slideInDown 0.3s ease-out;
+    }
+    @keyframes slideInDown {
+      from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+      to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+    .stance-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .stance-icon { font-size: 1.3rem; }
+    .stance-indicator.good {
+      border-color: rgba(78, 205, 196, 0.6);
+      background: rgba(78, 205, 196, 0.15);
+    }
+    .stance-indicator.bad {
+      border-color: rgba(255, 107, 107, 0.6);
+      background: rgba(255, 107, 107, 0.15);
+    }
+    #stance-text { color: #fff; }
+    @media (max-width: 768px) {
+      .form-guide {
+        top: 60px;
+        right: 10px;
+        min-width: 200px;
+        max-width: 250px;
+        padding: 12px;
+      }
+      .stance-indicator { padding: 8px 16px; }
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white font-sans">
+  <div class="flex flex-col h-screen">
+    <header class="bg-gradient-to-r from-red-600 to-red-700 p-4 flex justify-between items-center shadow-xl">
+      <div class="flex items-center space-x-4">
+        <img src="/src/assets/images/aj_logo.png" alt="AJ Logo" class="h-12 rounded-full shadow-lg">
+        <div>
+          <h1 class="text-2xl font-bold tracking-wider">Train Like AJ</h1>
+          <p class="text-xs text-red-200">AI-Powered Boxing Coach</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-6">
+        <div class="text-right">
+          <p class="text-sm text-red-200">Score</p>
+          <p id="score" class="text-3xl font-bold">0</p>
+        </div>
+        <div class="text-right">
+          <p class="text-sm text-red-200">Time</p>
+          <p id="timer" class="text-2xl font-bold">3:00</p>
+        </div>
+        <button id="sound-toggle" class="bg-red-800 hover:bg-red-900 p-2 rounded-lg transition-colors" title="Toggle Sound">🔊</button>
+      </div>
+    </header>
+
+    <main class="flex flex-1 overflow-hidden">
+      <div class="flex-1 relative bg-black flex justify-center items-center overflow-hidden">
+        <div id="loading-container" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 z-20">
+          <div class="loading-spinner"></div>
+          <p id="loading-message" class="text-2xl mt-4 text-gray-300">Initializing Camera...</p>
+          <p class="text-sm text-gray-500 mt-2">Please allow camera access</p>
+        </div>
+
+        <canvas id="output" class="absolute top-0 left-0 w-full h-full object-cover"></canvas>
+        <video id="video" class="hidden"></video>
+
+        <div id="error-message" class="absolute top-4 left-4 bg-red-600 p-4 rounded-lg shadow-lg hidden max-w-md">
+          <p class="font-bold">⚠️ Error</p>
+          <p class="text-sm mt-1"></p>
+        </div>
+
+        <div id="jab-target" class="target">JAB</div>
+        <div id="cross-target" class="target">CROSS</div>
+        <div id="combo-counter"></div>
+
+        <div id="form-guide" class="form-guide hidden">
+          <div class="form-guide-header">
+            <span class="form-guide-icon">📋</span>
+            <span class="form-guide-title">Form Check</span>
+          </div>
+          <div id="form-guide-content" class="form-guide-content">
+            <div class="form-tip">✅ Ready to train!</div>
+          </div>
+        </div>
+
+        <div id="stance-indicator" class="stance-indicator hidden">
+          <div class="stance-status">
+            <span class="stance-icon">🥊</span>
+            <span id="stance-text">Checking stance...</span>
+          </div>
+        </div>
+
+        <div id="stats-overlay" class="absolute bottom-4 left-4 bg-black bg-opacity-60 p-4 rounded-lg text-sm space-y-1 hidden">
+          <p>FPS: <span id="fps-counter">--</span></p>
+          <p>Total Punches: <span id="total-punches">0</span></p>
+          <p>Accuracy: <span id="accuracy">0%</span></p>
+        </div>
+      </div>
+
+      <aside class="w-80 bg-gradient-to-b from-gray-800 to-gray-900 p-6 space-y-6 border-l-4 border-red-600 overflow-y-auto">
+        <div class="bg-gray-700 rounded-xl p-4 shadow-lg">
+          <h2 class="text-lg font-semibold mb-2 text-gray-300">Last Punch</h2>
+          <p id="last-punch" class="text-4xl font-bold text-yellow-400 text-center">---</p>
+          <p id="punch-confidence" class="text-center text-sm text-gray-400 mt-1">--% confidence</p>
+        </div>
+
+        <div class="bg-gray-700 rounded-xl p-4 shadow-lg">
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="text-lg font-semibold text-gray-300">Speed</h2>
+            <span id="speed-value" class="text-yellow-400 font-bold">0%</span>
+          </div>
+          <div class="bg-gray-600 h-6 rounded-full overflow-hidden shadow-inner">
+            <div id="speed-bar" class="bg-gradient-to-r from-yellow-400 to-yellow-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div class="bg-gray-700 rounded-xl p-4 shadow-lg">
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="text-lg font-semibold text-gray-300">Form</h2>
+            <span id="form-value" class="text-red-400 font-bold">0%</span>
+          </div>
+          <div class="bg-gray-600 h-6 rounded-full overflow-hidden shadow-inner">
+            <div id="form-bar" class="bg-gradient-to-r from-red-500 to-red-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <p id="feedback" class="mt-2 text-sm text-gray-400 italic">Ready to train!</p>
+        </div>
+
+        <div class="bg-gray-700 rounded-xl p-4 shadow-lg">
+          <h2 class="text-lg font-semibold mb-3 text-gray-300">Session Stats</h2>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-400">Hits:</span>
+              <span id="session-hits" class="font-bold text-green-400">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Misses:</span>
+              <span id="session-misses" class="font-bold text-red-400">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Best Combo:</span>
+              <span id="best-combo" class="font-bold text-yellow-400">0x</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Level:</span>
+              <span id="current-level" class="font-bold text-purple-400">1</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-3 pt-4 border-t border-gray-700">
+          <button id="start-mitts" class="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 p-3 rounded-lg font-bold shadow-lg transition-all transform hover:scale-105 active:scale-95">🎯 Focus Mitt Drill</button>
+          <button id="start-timed" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 p-3 rounded-lg font-bold shadow-lg transition-all transform hover:scale-105 active:scale-95">⏱️ Timed Round (3 min)</button>
+          <button id="start-survival" class="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 p-3 rounded-lg font-bold shadow-lg transition-all transform hover:scale-105 active:scale-95">💪 Survival Mode</button>
+        </div>
+
+        <div class="space-y-2 pt-4 border-t border-gray-700">
+          <button id="toggle-stats" class="w-full bg-gray-700 hover:bg-gray-600 p-2 rounded-lg text-sm transition-colors">📊 Toggle Performance Stats</button>
+          <button id="toggle-form-guide" class="w-full bg-gray-700 hover:bg-gray-600 p-2 rounded-lg text-sm transition-colors">🎯 Form Guide: ON</button>
+          <button id="reset-session" class="w-full bg-gray-700 hover:bg-gray-600 p-2 rounded-lg text-sm transition-colors">🔄 Reset Session</button>
+        </div>
+
+        <div class="bg-gradient-to-br from-yellow-900 to-yellow-800 rounded-xl p-4 shadow-lg">
+          <h3 class="font-bold mb-2 flex items-center">💡 Pro Tip</h3>
+          <p id="training-tip" class="text-sm text-yellow-100">Keep your guard up and snap your punches back quickly!</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module">
+    import { detectPunch, resetPunchDetection } from '/src/js/punch.js';
+    import { calculateScore } from '/src/js/scoring.js';
+    import { startTimedMode, startSurvivalMode, FocusMittDrill } from '/src/js/game.js';
+    import { playSound, toggleSound, FPSCounter, gameState } from '/src/js/utils.js';
+
+    const videoElement = document.getElementById('video');
+    const canvasElement = document.getElementById('output');
+    const canvasCtx = canvasElement.getContext('2d');
+    const scoreElement = document.getElementById('score');
+    const punchElement = document.getElementById('last-punch');
+    const speedBar = document.getElementById('speed-bar');
+    const formBar = document.getElementById('form-bar');
+    const feedbackElement = document.getElementById('feedback');
+    const timerElement = document.getElementById('timer');
+    const errorMessage = document.getElementById('error-message');
+    const loadingContainer = document.getElementById('loading-container');
+    const jabTarget = document.getElementById('jab-target');
+    const crossTarget = document.getElementById('cross-target');
+    const statsOverlay = document.getElementById('stats-overlay');
+    const fpsCounter = new FPSCounter();
+
+    let totalScore = 0;
+    let activeDrill = null;
+    let sessionStats = { hits: 0, misses: 0, totalPunches: 0 };
+
+    const tips = [
+      "Keep your guard up and snap your punches back quickly!",
+      "Rotate your hips for maximum power in your cross!",
+      "A good jab sets up everything - master it first!",
+      "Breathe out sharply with each punch for more power!",
+      "Keep your shoulders relaxed and chin tucked!",
+      "Pivot your back foot when throwing the cross!",
+      "Speed comes from relaxation, not tension!",
+    ];
+    let currentTipIndex = 0;
+
+    function rotateTip() {
+      currentTipIndex = (currentTipIndex + 1) % tips.length;
+      document.getElementById('training-tip').textContent = tips[currentTipIndex];
+    }
+    setInterval(rotateTip, 10000);
+
+    // Form Guidance System
+    class FormGuide {
+      constructor() {
+        this.formGuideElement = document.getElementById('form-guide');
+        this.formContentElement = document.getElementById('form-guide-content');
+        this.stanceIndicator = document.getElementById('stance-indicator');
+        this.stanceText = document.getElementById('stance-text');
+        this.isEnabled = true;
+      }
+
+      toggle() {
+        this.isEnabled = !this.isEnabled;
+        if (!this.isEnabled) {
+          this.hide();
+          this.stanceIndicator.classList.add('hidden');
+        }
+        return this.isEnabled;
+      }
+
+      show() {
+        if (!this.isEnabled) return;
+        if (this.formGuideElement) {
+          this.formGuideElement.classList.remove('hidden');
+        }
+      }
+
+      hide() {
+        if (this.formGuideElement) {
+          this.formGuideElement.classList.add('hidden');
+        }
+      }
+
+      updateFormTips(punchData) {
+        if (!this.isEnabled || !this.formContentElement) return;
+
+        const { formTip, punch } = punchData;
+        
+        if (formTip && punch) {
+          this.show();
+          
+          const tipElement = document.createElement('div');
+          tipElement.className = 'form-tip';
+          
+          if (formTip.includes('Perfect') || formTip.includes('✅')) {
+            tipElement.classList.add('success');
+          } else if (formTip.includes('💡')) {
+            tipElement.classList.add('warning');
+          }
+          
+          tipElement.innerHTML = `<strong>${punch}:</strong> ${formTip}`;
+          
+          this.formContentElement.innerHTML = '';
+          this.formContentElement.appendChild(tipElement);
+          
+          setTimeout(() => {
+            if (tipElement.parentElement === this.formContentElement) {
+              tipElement.style.opacity = '0';
+              setTimeout(() => tipElement.remove(), 300);
+            }
+          }, 3000);
+        }
+      }
+
+      updateStance(stanceInfo) {
+        if (!this.isEnabled || !this.stanceIndicator) return;
+
+        this.stanceIndicator.classList.remove('hidden');
+        
+        if (stanceInfo.isGood) {
+          this.stanceIndicator.classList.remove('bad');
+          this.stanceIndicator.classList.add('good');
+          this.stanceText.textContent = '✅ Good Stance!';
+          this.stanceText.style.color = '#4ECDC4';
+        } else {
+          this.stanceIndicator.classList.remove('good');
+          this.stanceIndicator.classList.add('bad');
+          this.stanceText.textContent = '⚠️ ' + (stanceInfo.tips[0] || 'Adjust stance');
+          this.stanceText.style.color = '#FF6B6B';
+        }
+      }
+    }
+
+    const formGuide = new FormGuide();
+
+    function showError(message) {
+      console.error(message);
+      const errorDiv = errorMessage.querySelector('p.text-sm');
+      errorDiv.textContent = message;
+      errorMessage.classList.remove('hidden');
+      loadingContainer.classList.add('hidden');
+    }
+
+    function updateScore(points) {
+      totalScore += points;
+      scoreElement.textContent = totalScore;
+      scoreElement.classList.add('increase');
+      setTimeout(() => scoreElement.classList.remove('increase'), 300);
+      gameState.set('highScore', Math.max(gameState.get('highScore'), totalScore));
+    }
+
+    function updateSessionStats() {
+      document.getElementById('session-hits').textContent = sessionStats.hits;
+      document.getElementById('session-misses').textContent = sessionStats.misses;
+      document.getElementById('total-punches').textContent = sessionStats.totalPunches;
+      const accuracy = sessionStats.totalPunches > 0 ? ((sessionStats.hits / sessionStats.totalPunches) * 100).toFixed(1) : 0;
+      document.getElementById('accuracy').textContent = accuracy + '%';
+    }
+
+    function onResults(results) {
+      if (loadingContainer && !loadingContainer.classList.contains('hidden')) {
+        loadingContainer.classList.add('hidden');
+      }
+
+      fpsCounter.update();
+      document.getElementById('fps-counter').textContent = fpsCounter.getFPS();
+
+      canvasElement.width = results.image.width;
+      canvasElement.height = results.image.height;
+      
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      
+      if (results.poseLandmarks) {
+        detectPunch(results.poseLandmarks, canvasElement.width, canvasElement.height).then(punchData => {
+          if (punchData && punchData.punch) {
+            playSound('punch', { volume: 0.3 });
+            sessionStats.totalPunches++;
+            gameState.increment('totalPunches');
+            
+            if (punchData.formTip) {
+              formGuide.updateFormTips(punchData);
+            }
+            
+            if (punchData.extras && punchData.extras.stance) {
+              formGuide.updateStance(punchData.extras.stance);
+            }
+            
+            if (activeDrill && activeDrill.isRunning) {
+              const punchType = punchData.punch.toLowerCase().split(' ')[0];
+              const punchSpeed = punchType === 'cross' || punchType === 'right' ? punchData.extras.rightSpeed : punchData.extras.leftSpeed;
+              const punchAngle = punchType === 'cross' || punchType === 'right' ? punchData.extras.rightAngle : punchData.extras.leftAngle;
+              const scores = calculateScore({ punchType, speed: punchSpeed, angle: punchAngle });
+              activeDrill.checkPunch(punchData.punch, scores);
+            }
+
+            const punchType = punchData.punch.toLowerCase().split(' ')[0];
+            const punchSpeed = punchType === 'cross' || punchType === 'right' ? punchData.extras.rightSpeed : punchData.extras.leftSpeed;
+            const punchAngle = punchType === 'cross' || punchType === 'right' ? punchData.extras.rightAngle : punchData.extras.leftAngle;
+            const scores = calculateScore({ punchType, speed: punchSpeed, angle: punchAngle });
+
+            punchElement.textContent = punchData.punch.toUpperCase();
+            document.getElementById('punch-confidence').textContent = `${Math.round(punchData.confidence || 0)}% confidence`;
+            speedBar.style.width = `${scores.speedScore}%`;
+            formBar.style.width = `${scores.formScore}%`;
+            document.getElementById('speed-value').textContent = `${Math.round(scores.speedScore)}%`;
+            document.getElementById('form-value').textContent = `${Math.round(scores.formScore)}%`;
+
+            const avgScore = (scores.speedScore + scores.formScore) / 2;
+            if (avgScore > 90) feedbackElement.textContent = "🔥 PERFECT! Champion form!";
+            else if (avgScore > 75) feedbackElement.textContent = "💪 Excellent punch!";
+            else if (avgScore > 50) feedbackElement.textContent = "👍 Good! Keep it up!";
+            else feedbackElement.textContent = "Focus on form and speed!";
+
+            updateSessionStats();
+          } else {
+            if (punchData.extras && punchData.extras.stance) {
+              formGuide.updateStance(punchData.extras.stance);
+            }
+          }
+        });
+        
+        window.drawConnectors(canvasCtx, results.poseLandmarks, window.POSE_CONNECTIONS, { color: 'rgba(0, 255, 0, 0.5)', lineWidth: 3 });
+        window.drawLandmarks(canvasCtx, results.poseLandmarks, { color: 'rgba(255, 0, 0, 0.7)', lineWidth: 2, radius: 3 });
+      }
+      canvasCtx.restore();
+    }
+    
+    async function main() {
+      console.log('🥊 Initializing Train Like AJ V2...');
+      try {
+        const pose = new window.Pose({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        pose.onResults(onResults);
+        console.log('✅ MediaPipe Pose initialized');
+
+        const camera = new window.Camera(videoElement, { onFrame: async () => { await pose.send({ image: videoElement }); }, width: 1280, height: 720 });
+        await camera.start();
+        console.log('✅ Camera started successfully');
+        playSound('start');
+      } catch(e) {
+        showError('Failed to initialize camera. Please grant permission and refresh.');
+        console.error(e);
+      }
+    }
+    
+    document.addEventListener('DOMContentLoaded', main);
+
+    document.getElementById('start-mitts').addEventListener('click', () => {
+      if (activeDrill && activeDrill.isRunning) {
+        activeDrill.stop();
+        activeDrill = null;
+        document.getElementById('start-mitts').textContent = '🎯 Focus Mitt Drill';
+      } else {
+        totalScore = 0;
+        scoreElement.textContent = '0';
+        sessionStats = { hits: 0, misses: 0, totalPunches: 0 };
+        resetPunchDetection();
+        const drillUI = { jabTarget, crossTarget };
+        activeDrill = new FocusMittDrill(drillUI, updateScore);
+        activeDrill.start();
+        document.getElementById('start-mitts').textContent = '⏹️ Stop Drill';
+      }
+    });
+
+    document.getElementById('start-timed').addEventListener('click', () => {
+      if (activeDrill && activeDrill.isRunning) activeDrill.stop();
+      totalScore = 0;
+      scoreElement.textContent = '0';
+      sessionStats = { hits: 0, misses: 0, totalPunches: 0 };
+      resetPunchDetection();
+      startTimedMode(timerElement);
+    });
+
+    document.getElementById('start-survival').addEventListener('click', () => {
+      if (activeDrill && activeDrill.isRunning) activeDrill.stop();
+      totalScore = 0;
+      scoreElement.textContent = '0';
+      sessionStats = { hits: 0, misses: 0, totalPunches: 0 };
+      resetPunchDetection();
+      startSurvivalMode(timerElement);
+    });
+
+    document.getElementById('sound-toggle').addEventListener('click', (e) => {
+      const enabled = toggleSound();
+      e.target.textContent = enabled ? '🔊' : '🔇';
+    });
+
+    document.getElementById('toggle-stats').addEventListener('click', () => {
+      statsOverlay.classList.toggle('hidden');
+    });
+
+    document.getElementById('toggle-form-guide').addEventListener('click', (e) => {
+      const enabled = formGuide.toggle();
+      e.target.textContent = enabled ? '🎯 Form Guide: ON' : '🎯 Form Guide: OFF';
+    });
+
+    document.getElementById('reset-session').addEventListener('click', () => {
+      if (confirm('Reset session stats?')) {
+        totalScore = 0;
+        scoreElement.textContent = '0';
+        sessionStats = { hits: 0, misses: 0, totalPunches: 0 };
+        updateSessionStats();
+        if (activeDrill && activeDrill.isRunning) activeDrill.stop();
+      }
+    });
+
+    console.log('✅ Train Like AJ V2 Loaded!');
+  </script>
+</body>
+</html>
