@@ -15,16 +15,17 @@ class SoundManager {
     this.initializeSounds();
   }
 
+
   initializeSounds() {
     const soundPaths = {
-      'hit': '/src/assets/sounds/playerHit.wav',
-      'punch': '/src/assets/sounds/punch.mp3',
-      'combo': '/src/assets/sounds/combo.wav',
-      'miss': '/src/assets/sounds/punch.mp3',
-      'target': '/src/assets/sounds/punch.mp3',
-      'start': '/src/assets/sounds/punch.mp3',
-      'levelup': '/src/assets/sounds/combo.wav',
-      'background': '/src/assets/sounds/punch.mp3',
+      'hit': 'src/assets/sounds/playerHit.wav',
+      'punch': 'src/assets/sounds/punch.wav',
+      'combo': 'src/assets/sounds/combo.wav',
+      'miss': 'src/assets/sounds/punch.wav',
+      'target': 'src/assets/sounds/punch.wav',
+      'start': 'src/assets/sounds/punch.wav',
+      'levelup': 'src/assets/sounds/combo.wav',
+      'background': 'src/assets/sounds/punch.wav',
     };
 
     for (const [id, path] of Object.entries(soundPaths)) {
@@ -416,6 +417,31 @@ export async function logAsyncPerformance(label, asyncFn) {
   console.log(`${label}: ${(end - start).toFixed(2)}ms`);
   return result;
 }
+
+
+export function speakCoach(text) {
+  if ('speechSynthesis' in window) {
+    // Cancel any current speech so he doesn't talk over himself
+    window.speechSynthesis.cancel(); 
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    
+    // Try to find a British Male voice (Google UK English Male, or similar)
+    const britishVoice = voices.find(v => 
+      (v.lang.includes('en-GB') || v.lang.includes('en_GB')) && v.name.includes('Male')
+    ) || voices.find(v => v.lang.includes('en-GB')); // Fallback to any British
+
+    if (britishVoice) utterance.voice = britishVoice;
+    
+    utterance.rate = 1.1; // AJ talks with energy
+    utterance.pitch = 0.9; // Slightly deeper
+    utterance.volume = 1.0;
+    
+    window.speechSynthesis.speak(utterance);
+  }
+}
+
 
 export const Utils = {
   computeAngle,

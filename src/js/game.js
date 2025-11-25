@@ -1,5 +1,5 @@
 // src/js/game.js - V2 Complete with 8 Punch Types & Progressive Unlocking
-import { playSound, stopSound } from '/src/js/utils.js';
+import { playSound, stopSound, speakCoach } from '/src/js/utils.js';
 
 let timerInterval;
 let timeLeft = 180;
@@ -63,6 +63,7 @@ export class FocusMittDrill {
     this.isRunning = true;
     this.resetStats();
     playSound('start');
+    speakCoach("Let's go champ! Focus on the targets.");
     showNotification('Focus Mitt Drill Started!', 'info');
     this.updateAvailablePunches();
     this.nextChallenge();
@@ -258,6 +259,8 @@ export class FocusMittDrill {
     if (this.comboCount > 0) {
       playSound('miss');
       showNotification(`Combo Lost! (${this.comboCount}x)`, 'warning');
+      const encouragements = ["Keep your hands up!", "Focus!", "Stay sharp!", "Don't drop your guard!"];
+      speakCoach(encouragements[Math.floor(Math.random() * encouragements.length)]);
       this.resetCombo();
     }
     
@@ -276,6 +279,7 @@ export class FocusMittDrill {
     this.level++;
     this.hitsInLevel = 0;
     playSound('levelup');
+    speakCoach(`Level ${this.level}! Increasing speed.`);
     
     this.updateAvailablePunches();
     
