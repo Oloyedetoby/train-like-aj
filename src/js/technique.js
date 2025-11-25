@@ -1,4 +1,4 @@
-// src/js/technique.js - COMPLETE MULTI-PUNCH LOGIC
+// src/js/technique.js - COMPLETE & TEXT MIRROR FIXED
 import { computeAngle, playSound, speakCoach } from '/src/js/utils.js';
 
 export class TechniqueTrainer {
@@ -29,8 +29,7 @@ export class TechniqueTrainer {
 
     let analysis = { passed: false, feedback: '', errors: [], data: {} };
 
-    // --- THIS SWITCH STATEMENT IS CRITICAL ---
-    // It directs the AI to the correct math for the selected punch
+    // Direct the AI to the correct math for the selected punch
     switch(this.currentMove) {
       case 'Jab':
         analysis = this.analyzeStraightPunch(landmarks, 'left');
@@ -68,16 +67,14 @@ export class TechniqueTrainer {
     const shoulder = landmarks[side === 'left' ? 11 : 12];
     const elbow = landmarks[side === 'left' ? 13 : 14];
     const wrist = landmarks[side === 'left' ? 15 : 16];
-    const otherWrist = landmarks[side === 'left' ? 16 : 15];
-    const nose = landmarks[0];
-
+    
     const elbowAngle = computeAngle(shoulder, elbow, wrist);
     let errors = [];
 
-    // 1. Extension Check (Must be straight)
+    // 1. Extension Check
     if (elbowAngle < 150) errors.push("Extend arm fully!");
     
-    // 2. Height Check (Punching too low or high?)
+    // 2. Height Check
     if (Math.abs(wrist.y - shoulder.y) > 0.20) errors.push("Punch at shoulder level");
 
     return {
@@ -97,12 +94,11 @@ export class TechniqueTrainer {
     const elbowAngle = computeAngle(shoulder, elbow, wrist);
     let errors = [];
 
-    // 1. Angle Check (The 90 degree rule)
+    // 1. Angle Check
     if (elbowAngle > 130) errors.push("Don't slap! Bend arm (90°)");
     if (elbowAngle < 60) errors.push("Open arm slightly");
 
     // 2. Elbow Height (Chicken Wing)
-    // Elbow should be roughly parallel to shoulder
     const heightDiff = Math.abs(elbow.y - shoulder.y);
     if (heightDiff > 0.15) errors.push("Raise your elbow!");
 
@@ -123,10 +119,10 @@ export class TechniqueTrainer {
     const elbowAngle = computeAngle(shoulder, elbow, wrist);
     let errors = [];
 
-    // 1. Angle Check (Tight angle for uppercut)
+    // 1. Angle Check
     if (elbowAngle > 110) errors.push("Bend arm more!");
 
-    // 2. Position Check (Wrist must be above elbow)
+    // 2. Position Check
     if (wrist.y > elbow.y) errors.push("Punch UPWARDS!");
 
     // 3. Elbow Tucked 
@@ -150,7 +146,8 @@ export class TechniqueTrainer {
 
     ctx.save();
     
-    // Draw the Skeleton Overlay
+    // 1. DRAW SKELETON (Keep Mirror Mode)
+    // We draw the lines on the mirrored canvas so they align with the video
     ctx.lineWidth = 6;
     ctx.strokeStyle = color;
     ctx.lineCap = 'round';
@@ -169,10 +166,17 @@ export class TechniqueTrainer {
       ctx.fill();
     });
 
+    // 2. DRAW TEXT (UN-MIRROR MODE)
+    // We flip the context horizontally just for the text, so it reads correctly left-to-right
+    ctx.save();
+    ctx.scale(-1, 1); 
+    
     // Draw Angle Text
+    // Note: Since we flipped X, we must use negative X coordinates to place text correctly
     ctx.fillStyle = '#FFFFFF';
     ctx.font = "bold 20px Arial";
-    ctx.fillText(`${Math.round(angle)}°`, elbow.x * width + 20, elbow.y * height);
+    // We place it at -(elbow.x) because 0 is right side now in this coordinate system relative to flip
+    ctx.fillText(`${Math.round(angle)}°`, -(elbow.x * width), elbow.y * height - 20);
 
     // Draw Feedback Text (Big and Center)
     ctx.shadowColor = "black";
@@ -180,9 +184,12 @@ export class TechniqueTrainer {
     ctx.font = "bold 40px Arial";
     ctx.fillStyle = analysis.passed ? '#00FF00' : '#FF4444';
     ctx.textAlign = "center";
-    ctx.fillText(analysis.feedback, width / 2, height * 0.15);
     
-    ctx.restore();
+    // Center of screen is -width / 2 because of the flip
+    ctx.fillText(analysis.feedback, -width / 2, height * 0.15);
+    
+    ctx.restore(); // Restore mirror mode for next frame
+    ctx.restore(); // Restore original context
   }
 
   drawArrow(ctx, x, y, dx, dy) {
@@ -216,7 +223,7 @@ export class TechniqueTrainer {
       if (progress >= 1) {
         this.isHoldingPosition = false;
         playSound('combo'); // Success sound
-        speakCoach("Good form! Select another punch.");
+        speakCoach("Good form!");
         
         // Stop logic so it doesn't spam
         this.stop();

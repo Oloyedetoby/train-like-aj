@@ -21,11 +21,11 @@ class SoundManager {
       'hit': 'src/assets/sounds/playerHit.wav',
       'punch': 'src/assets/sounds/punch.wav',
       'combo': 'src/assets/sounds/combo.wav',
-      'miss': 'src/assets/sounds/punch.wav',
-      'target': 'src/assets/sounds/punch.wav',
+      //'miss': 'src/assets/sounds/miss.wav',
+      //'target': 'src/assets/sounds/target.wav',
       'start': 'src/assets/sounds/punch.wav',
-      'levelup': 'src/assets/sounds/combo.wav',
-      'background': 'src/assets/sounds/punch.wav',
+      'levelup': 'src/assets/sounds/levelup.wav',
+      'background': 'src/assets/sounds/background.wav',
     };
 
     for (const [id, path] of Object.entries(soundPaths)) {
